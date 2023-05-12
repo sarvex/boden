@@ -26,7 +26,7 @@ class AssetSet:
             self.ext = "appiconset"
             self.content_section_name = "images"
 
-        self.path = os.path.join(path, "%s.%s" % (name, self.ext))
+        self.path = os.path.join(path, f"{name}.{self.ext}")
 
         self.contents = {
             "info" : {

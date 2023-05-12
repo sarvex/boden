@@ -22,16 +22,14 @@ class Roger:
                 os.makedirs(folder)
             except OSError as e:
                 if e.errno != errno.EEXIST:
-                    raise
-            except FileExistsError:
-                pass 
+                    raise 
 
     def copy(self, args, src, dest):
         folder = os.path.dirname(dest)
         src = self.full_path(src)
 
         if args.action == 'build':
-            logging.debug("Copying %s => %s" % ( src, dest ))
+            logging.debug(f"Copying {src} => {dest}")
             self.make_directories(folder)  
 
             shutil.copyfile(src, dest)
@@ -44,22 +42,20 @@ class Roger:
 
     def get_source_image(self, args, resolution):
         r = resolution
-        if type(r) is dict:
-            if "execute" in r:
-                command = r['execute']
-                input_file = self.full_path(r['file'])
-                output_type = r['output-type']
+        if type(r) is dict and "execute" in r:
+            command = r['execute']
+            input_file = self.full_path(r['file'])
+            if args.action == "dependencies":
+                return input_file
 
-                if args.action == "dependencies":
-                    return input_file
+            output_type = r['output-type']
 
-                return Exe2Img.create(command, input_file, output_type)
+            return Exe2Img.create(command, input_file, output_type)
 
         return r
 
     def copy_image(self, args, lang_folder_name, bundle_path, resolutions, resolutionId, suffix):
-        if resolutionId in resolutions:
-            if len(resolutions[resolutionId]) > 0:
-                source_image = self.get_source_image(args, resolutions[resolutionId])
-                return self.copy_file(args, lang_folder_name, source_image, bundle_path, suffix)
+        if resolutionId in resolutions and len(resolutions[resolutionId]) > 0:
+            source_image = self.get_source_image(args, resolutions[resolutionId])
+            return self.copy_file(args, lang_folder_name, source_image, bundle_path, suffix)
         return False

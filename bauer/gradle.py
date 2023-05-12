@@ -27,12 +27,12 @@ class Gradle:
         self.rootPath = rootPath
 
     def stop(self):
-        self.logger.debug("Calling %s --stop" % (self.getGradlePath()))
-        subprocess.call('"%s" --stop' % (self.getGradlePath()), shell=True);
+        self.logger.debug(f"Calling {self.getGradlePath()} --stop")
+        subprocess.call(f'"{self.getGradlePath()}" --stop', shell=True);
 
 
     def getGradlePath(self):
-        if self.gradlePath is None:            
+        if self.gradlePath is None:        
 
             # first try to call an installed gradle version.
 
@@ -63,13 +63,14 @@ class Gradle:
 
                     self.logger.info("Downloading gradle...")
 
-                    gradle_zip_file_name = gradle_version_name+"-bin.zip"
+                    gradle_zip_file_name = f"{gradle_version_name}-bin.zip"
 
                     gradle_download_file = os.path.join(gradle_base_dir, gradle_zip_file_name)
 
                     download_file(
-                        "https://services.gradle.org/distributions/"+gradle_zip_file_name,
-                        gradle_download_file)
+                        f"https://services.gradle.org/distributions/{gradle_zip_file_name}",
+                        gradle_download_file,
+                    )
 
                     self.logger.info("Extracting gradle...")
 
@@ -84,7 +85,9 @@ class Gradle:
                         os.chmod(gradle_path, stat.S_IXUSR|stat.S_IRUSR)
 
                     if not os.path.exists(gradle_path):
-                        raise Exception("Gradle executable not found after fresh download. Expected here: "+gradle_path)
+                        raise Exception(
+                            f"Gradle executable not found after fresh download. Expected here: {gradle_path}"
+                        )
 
                 self.gradlePath = gradle_path
 

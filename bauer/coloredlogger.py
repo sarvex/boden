@@ -86,8 +86,7 @@ class ColorizingStreamHandler(logging.StreamHandler):
                 if fd in (1, 2): # stdout or stderr
                     h = ctypes.windll.kernel32.GetStdHandle(-10 - fd)
             while parts:
-                text = parts.pop(0)
-                if text:
+                if text := parts.pop(0):
                     write(text)
                 if parts:
                     params = parts.pop(0)
@@ -103,8 +102,6 @@ class ColorizingStreamHandler(logging.StreamHandler):
                                 color |= 0x08 # foreground intensity on
                             elif p == 0: # reset to default color
                                 color = 0x07
-                            else:
-                                pass # error condition ignored
                         self.stream.flush()
                         ctypes.windll.kernel32.SetConsoleTextAttribute(h, color)
 

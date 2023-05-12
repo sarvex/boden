@@ -43,7 +43,7 @@ def parse_arguments(argv):
 def main(argv):
     setup_logging(argv)
     args = parse_arguments(argv)
-    logging.debug("Arguments: %s" %(args))
+    logging.debug(f"Arguments: {args}")
 
     if not args or args.action is None:
         return

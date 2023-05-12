@@ -41,7 +41,7 @@ def run(argv):
 
     args = argParser.parse_args()
 
-    if args == None:
+    if args is None:
         return
 
     if args.command == 'new':
@@ -74,7 +74,7 @@ def main(argv):
     except cmakelib.CMakeError as e:
 
         if '-d' in argv:
-            print("CMake error: %s" % (e.cmakeError), file=sys.stderr)
+            print(f"CMake error: {e.cmakeError}", file=sys.stderr)
             print(" packet:", e.packet, file=sys.stderr)
             traceback.print_exc();
         else:

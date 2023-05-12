@@ -45,7 +45,9 @@ class IOSRunner:
         self.logger.debug("Executable: %s", artifactToRun)
 
         if not artifactToRun:
-            raise error.ProgramArgumentError("Couldn't find path to exectuable for Module %s" % args.target)
+            raise error.ProgramArgumentError(
+                f"Couldn't find path to exectuable for Module {args.target}"
+            )
 
         if artifactToRun.endswith('.app') and os.path.isdir(artifactToRun):
             r = self.readPList(os.path.join(artifactToRun, "Info.plist"))
@@ -53,7 +55,9 @@ class IOSRunner:
             artifactToRun = os.path.join(artifactToRun, executable)
 
         if not os.path.exists(artifactToRun):
-            raise error.ProgramArgumentError("exectuable for Module %s does not exists at: %s" % (args.target, artifactToRun))
+            raise error.ProgramArgumentError(
+                f"exectuable for Module {args.target} does not exists at: {artifactToRun}"
+            )
 
         bundlePath = self.getBundlePathFromExecutable(artifactToRun)
 
@@ -62,13 +66,13 @@ class IOSRunner:
 
         simulatorId = None
         try:
-            if self.ios_device_id != None:
-                simulatorId = self.ios_device_id
-            else:
+            if self.ios_device_id is None:
                 simulatorId = self.createSimulatorDevice()
                 self.logger.debug("Simulator Id: %s", simulatorId)
                 self.bootSimulator(simulatorId)
-    
+
+            else:
+                simulatorId = self.ios_device_id
             self.installApp(simulatorId, bundlePath)
             processId = self.startApp(simulatorId, bundleId, args)
         finally:
@@ -78,7 +82,7 @@ class IOSRunner:
         return 0
      
     def createSimulatorDevice(self):
-        simulatorName = "bdnTestSim-" + str(random.getrandbits(32))
+        simulatorName = f"bdnTestSim-{random.getrandbits(32)}"
 
         self.logger.debug("Simulator name: %s", simulatorName)
 
@@ -99,14 +103,14 @@ class IOSRunner:
 
         # note that this will fail if the simulator is already booted or is currently booting up.
         # That is ok.
-        subprocess.call("xcrun simctl boot " + simulatorId, shell=True)
+        subprocess.call(f"xcrun simctl boot {simulatorId}", shell=True)
 
         self.waitForSimulatorStatus(simulatorId, "booted", 600)
 
     def installApp(self, simulatorId, bundlePath):
         self.logger.info("Installing Application in simulator ...")
-        cmdLine = 'xcrun simctl install "%s" "%s"' % (simulatorId, bundlePath)
-        self.logger.debug("Starting: %s" %(cmdLine))
+        cmdLine = f'xcrun simctl install "{simulatorId}" "{bundlePath}"'
+        self.logger.debug(f"Starting: {cmdLine}")
         subprocess.check_output(cmdLine, shell=True)
 
     def startApp(self, simulatorId, bundleId, args):
@@ -119,7 +123,7 @@ class IOSRunner:
             self.stdOutFileName = os.path.abspath(args.run_output_file);
             if os.path.exists(self.stdOutFileName):
                 os.remove(self.stdOutFileName)
-            
+
             self.logger.debug("Redirecting Applications stdout to: %s", self.stdOutFileName)
         else:
             tf = tempfile.NamedTemporaryFile(mode='w+b', delete=False)
@@ -129,9 +133,9 @@ class IOSRunner:
         arguments = ["xcrun",  "simctl", "launch", "--console-pty" ] + [simulatorId, bundleId] + args.params
 
         commandLine = ' '.join('"{0}"'.format(arg) for arg in arguments)
-        commandLine += " > %s 2>&1 " % (self.stdOutFileName);
+        commandLine += f" > {self.stdOutFileName} 2>&1 ";
 
-        self.logger.debug("Starting: %s" % commandLine)
+        self.logger.debug(f"Starting: {commandLine}")
 
         result = subprocess.check_call( commandLine , shell=True)
 
@@ -172,11 +176,11 @@ class IOSRunner:
 
     def shutdownSimulator(self, simulatorId):
         self.logger.info("Shutting down simulator");
-        subprocess.call('xcrun simctl shutdown "%s"' % simulatorId, shell=True );
+        subprocess.call(f'xcrun simctl shutdown "{simulatorId}"', shell=True);
         # note that shutdown automatically waits until the simulator has finished shutting down
 
         self.logger.info("Deleting simulator device.");
-        subprocess.call('xcrun simctl delete "%s"' % simulatorId, shell=True)
+        subprocess.call(f'xcrun simctl delete "{simulatorId}"', shell=True)
 
     def waitForSimulatorStatus(self, simulatorId, wait_for_status, timeout_seconds):
         timeout_time = time.time()+timeout_seconds
@@ -199,30 +203,28 @@ class IOSRunner:
     def getSimulatorStatus(self, simulatorId):
         output = subprocess.check_output("xcrun simctl list", shell=True).decode(encoding='utf-8')
 
-        search_for = "("+simulatorId+")"
+        search_for = f"({simulatorId})"
 
         for line in output.splitlines():
             if search_for in line:
                 before, sep, status = line.rpartition("(")
                 if sep:
                     status, sep, after = status.partition(")")
-                    if sep and status:
-                        return status.lower()
+                if sep and status:
+                    return status.lower()
 
         return None
 
     def getBundlePathFromExecutable(self, executablePath):
-        bundlePath = os.path.abspath(os.path.join( executablePath, ".."))
-        return bundlePath
+        return os.path.abspath(os.path.join( executablePath, ".."))
 
     def readPList(self, plistPath):
         self.logger.info("Reading plist at %s", plistPath)
         if sys.version_info >= (3, 0):
             return plistlib.load( open(plistPath, "rb") )
-        else:
-            tf = tempfile.NamedTemporaryFile(mode='w+b', delete=False)
-            os.system('plutil -convert xml1 %s -o %s' % (plistPath,tf.name))
-            return plistlib.readPlist(open(tf.name, "rb"))
+        tf = tempfile.NamedTemporaryFile(mode='w+b', delete=False)
+        os.system(f'plutil -convert xml1 {plistPath} -o {tf.name}')
+        return plistlib.readPlist(open(tf.name, "rb"))
 
     def getBundleIdentifier(self, bundlePath):
         plistPath = os.path.abspath(os.path.join( bundlePath, "Info.plist"))

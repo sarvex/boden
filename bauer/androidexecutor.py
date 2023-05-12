@@ -77,17 +77,16 @@ class AndroidExecutor:
 
         if target == "clean":
             arguments += ["clean"]
+        elif args.config=="Release":
+            arguments += ["assembleRelease"]
         else:
-            if args.config=="Release":
-                arguments += ["assembleRelease"]
-            else:
-                arguments += ["assembleDebug"]
+            arguments += ["assembleDebug"]
 
         self.logger.debug("Starting: %s", arguments)
 
         exitCode = subprocess.call(" ".join(arguments), shell=True, cwd=buildDir, env=self.getToolEnv());
         if exitCode!=0:
-            raise error.ToolFailedError("%s" %(arguments), exitCode);
+            raise error.ToolFailedError(f"{arguments}", exitCode);
 
     def build(self, configuration, args):
         self.buildTarget(configuration, args, None)
@@ -122,28 +121,28 @@ class AndroidExecutor:
             raise error.InvalidArchitectureError("No target architecture specified. The architecture parameter is required for makefile build systems.")
 
         cmakeArguments = [
-            "-DCMAKE_TOOLCHAIN_FILE=%s/ndk-bundle/build/cmake/android.toolchain.cmake" % (androidHome),
-            "-DANDROID_ABI=%s" % (android_abi_arg),
-            "-DANDROID_NATIVE_API_LEVEL=%s" % ( self.androidBuildApiVersion ),
-            "-DCMAKE_BUILD_TYPE=%s" % (configuration.config),
+            f"-DCMAKE_TOOLCHAIN_FILE={androidHome}/ndk-bundle/build/cmake/android.toolchain.cmake",
+            f"-DANDROID_ABI={android_abi_arg}",
+            f"-DANDROID_NATIVE_API_LEVEL={self.androidBuildApiVersion}",
+            f"-DCMAKE_BUILD_TYPE={configuration.config}",
             "-DBDN_BUILD_TESTS=Off",
             "-DBDN_BUILD_EXAMPLES=Off",
         ]
 
         if args.cmake_option:
             for option in args.cmake_option:
-                cmakeArguments += ["-D" + option]
+                cmakeArguments += [f"-D{option}"]
 
 
         if args.package_generator:
-            cmakeArguments += ["-DCPACK_GENERATOR=%s" % (args.package_generator)]
+            cmakeArguments += [f"-DCPACK_GENERATOR={args.package_generator}"]
 
         if args.package_folder:
             packageFolder = args.package_folder
             if not os.path.isabs(packageFolder):
                 packageFolder = os.path.join(self.buildFolder.getBaseBuildDir(), packageFolder)
 
-            cmakeArguments += ["-DCPACK_OUTPUT_FILE_PREFIX=%s" % (packageFolder)]
+            cmakeArguments += [f"-DCPACK_OUTPUT_FILE_PREFIX={packageFolder}"]
 
 
         self.logger.warning("Disabling examples and tests, as we cannot build apk's yet.")
@@ -156,8 +155,6 @@ class AndroidExecutor:
         self.logger.debug(" Generator: %s", "Unix Makefiles")
 
         self.cmake.configure(cmakeArguments)
-
-        pass
 
     def prepareAndroidStudio(self, platformState, configuration, androidAbi, androidHome, buildDir, args):
         gradlePath = self.gradle.getGradlePath()
@@ -176,19 +173,22 @@ class AndroidExecutor:
 
         self.cmake.open(self.sourceDirectory, tmpCMakeFolder, "Unix Makefiles")
 
-        cmakeArguments = [ 
-            "-DCMAKE_TOOLCHAIN_FILE=%s/ndk-bundle/build/cmake/android.toolchain.cmake" % (androidHome), 
-            "-DCMAKE_SYSTEM_NAME=Android", 
-            "-DANDROID_ABI=%s" % (makefile_android_abi),
-            "-DANDROID_NATIVE_API_LEVEL=%s" % ( self.androidBuildApiVersion ),
-            "-DBAUER_RUN=Yes" ]
+        cmakeArguments = [
+            f"-DCMAKE_TOOLCHAIN_FILE={androidHome}/ndk-bundle/build/cmake/android.toolchain.cmake",
+            "-DCMAKE_SYSTEM_NAME=Android",
+            f"-DANDROID_ABI={makefile_android_abi}",
+            f"-DANDROID_NATIVE_API_LEVEL={self.androidBuildApiVersion}",
+            "-DBAUER_RUN=Yes",
+        ]
 
         if sys.platform == 'win32':
-            cmakeArguments += ["-DCMAKE_MAKE_PROGRAM=%s/ndk-bundle/prebuilt/windows-x86_64/bin/make.exe" % (androidHome)]
+            cmakeArguments += [
+                f"-DCMAKE_MAKE_PROGRAM={androidHome}/ndk-bundle/prebuilt/windows-x86_64/bin/make.exe"
+            ]
 
         if args.cmake_option:
             for option in args.cmake_option:
-                cmakeArguments += ["-D" + option]
+                cmakeArguments += [f"-D{option}"]
 
         self.logger.debug("Starting configure ...")
         self.logger.debug(" Arguments: %s", cmakeArguments)
@@ -209,7 +209,11 @@ class AndroidExecutor:
         targetNames = []
         targets = []
         for target in project["targets"]:
-            if target["type"] == "SHARED_LIBRARY" or target["type"] == "EXECUTABLE" or target["type"] == "STATIC_LIBRARY":
+            if target["type"] in [
+                "SHARED_LIBRARY",
+                "EXECUTABLE",
+                "STATIC_LIBRARY",
+            ]:
                 self.logger.debug("Found target: %s", target["name"])
                 targetNames += [target["name"]]
                 targets += [target]
@@ -258,10 +262,7 @@ class AndroidExecutor:
         return android_home_dir.replace('\\', '/')
 
     def getAndroidABIFromArch(self, arch):
-        if arch=="std":
-            return None
-        else:
-            return arch
+        return None if arch=="std" else arch
 
     def getAndroidABI(self, configuration):
         return self.getAndroidABIFromArch(configuration.arch)
@@ -269,13 +270,13 @@ class AndroidExecutor:
     def getBuildToolPath(self, androidHome, tool):
         path = os.path.join(androidHome, tool)
         if sys.platform == "win32":
-            if os.path.exists(path + ".bat"):
+            if os.path.exists(f"{path}.bat"):
                 path += ".bat"
-            elif os.path.exists(path + ".exe"):
+            elif os.path.exists(f"{path}.exe"):
                 path += ".exe"
 
         if not os.path.exists(path):
-            raise Exception("Couldn't find %s" % (tool))
+            raise Exception(f"Couldn't find {tool}")
 
         return path
 
@@ -310,7 +311,7 @@ class AndroidExecutor:
 
     def tryDetectAndroidCmakeComponentName(self, sdkManagerPath):
 
-        command = '"%s" --list' % (sdkManagerPath)
+        command = f'"{sdkManagerPath}" --list'
         try:
             output = subprocess.check_output( command, shell=True, env=self.getToolEnv(), universal_newlines=True )
         except:
@@ -331,34 +332,33 @@ class AndroidExecutor:
             androidHome = self.getAndroidHome()
             sdkManagerPath = self.getBuildToolPath(androidHome, "tools/bin/sdkmanager")
 
-            sdkManagerCommand = '"%s" --list' % (sdkManagerPath)
+            sdkManagerCommand = f'"{sdkManagerPath}" --list'
             output =  subprocess.check_output(sdkManagerCommand, shell=True, env=self.getToolEnv() )
 
             for line in output.splitlines():
                 parts = line.decode('utf-8').split('|')
-                if len(parts) == 3:
-                    if parts[0].strip() == 'platform-tools':
-                        version = parts[1].strip()
-                        if version == '29.0.3':
-                            self.logger.info("Since platform-tools 29.0.3 breaks debugging native apps, we manually download 29.0.2")
-                            tf = tempfile.NamedTemporaryFile(mode='w+b', delete=False)
+                if len(parts) == 3 and parts[0].strip() == 'platform-tools':
+                    version = parts[1].strip()
+                    if version == '29.0.3':
+                        self.logger.info("Since platform-tools 29.0.3 breaks debugging native apps, we manually download 29.0.2")
+                        tf = tempfile.NamedTemporaryFile(mode='w+b', delete=False)
 
-                            sourceName = "https://dl.google.com/android/repository/platform-tools_r29.0.2-"
-                            if "linux" in sys.platform :
-                                sourceName += "linux"
-                            elif sys.platform == "win32":
-                                sourceName += "windows"
-                            elif sys.platform == "darwin":
-                                sourceName += "darwin"
-                            sourceName += ".zip"
+                        sourceName = "https://dl.google.com/android/repository/platform-tools_r29.0.2-"
+                        if "linux" in sys.platform :
+                            sourceName += "linux"
+                        elif sys.platform == "win32":
+                            sourceName += "windows"
+                        elif sys.platform == "darwin":
+                            sourceName += "darwin"
+                        sourceName += ".zip"
 
-                            download_file(sourceName, tf.name)
+                        download_file(sourceName, tf.name)
 
-                            zipf = MyZipFile(tf.name, 'r')
-                            zipf.extractall(androidHome)
-                            zipf.close()
+                        zipf = MyZipFile(tf.name, 'r')
+                        zipf.extractall(androidHome)
+                        zipf.close()
 
-                            return True
+                        return True
             return False
         except:
             return False
@@ -372,15 +372,18 @@ class AndroidExecutor:
         if accept_terms:
             self.logger.info("Ensuring that all android license agreements are accepted ...")
 
-            licenseCall = subprocess.Popen( '"%s" --licenses' % sdkManagerPath, shell=True, env=self.getToolEnv(), stdin=subprocess.PIPE )
+            licenseCall = subprocess.Popen(
+                f'"{sdkManagerPath}" --licenses',
+                shell=True,
+                env=self.getToolEnv(),
+                stdin=subprocess.PIPE,
+            )
 
-            licenseInputData = ""
-            for i in range(100):
-                licenseInputData += "y\n"
+            licenseInputData = "".join("y\n" for _ in range(100))
             licenseCall.communicate(licenseInputData.encode('utf-8'))
 
             self.logger.info("Done updating licenses.")
-        
+
         self.logger.info("Ensuring that all necessary android packages are installed...")
 
         platformToolsPackageName = '"platform-tools"'
@@ -388,15 +391,12 @@ class AndroidExecutor:
         if self.workaroundPlatformTools2903():
             platformToolsPackageName = ""
 
-        sdkManagerCommand = '"%s" %s "ndk-bundle" "extras;android;m2repository" "extras;google;m2repository" "build-tools;%s" "platforms;android-%s"' % (
-            sdkManagerPath, 
-            platformToolsPackageName,
-            self.androidBuildToolsVersion,
-            self.androidBuildApiVersion )
+        sdkManagerCommand = f'"{sdkManagerPath}" {platformToolsPackageName} "ndk-bundle" "extras;android;m2repository" "extras;google;m2repository" "build-tools;{self.androidBuildToolsVersion}" "platforms;android-{self.androidBuildApiVersion}"'
 
-        cmakeComponentName = self.tryDetectAndroidCmakeComponentName(sdkManagerPath);
-        if cmakeComponentName:
-            sdkManagerCommand += ' "%s"' % cmakeComponentName
+        if cmakeComponentName := self.tryDetectAndroidCmakeComponentName(
+            sdkManagerPath
+        ):
+            sdkManagerCommand += f' "{cmakeComponentName}"'
 
         try:
             subprocess.check_call( sdkManagerCommand, shell=True, env=self.getToolEnv() )

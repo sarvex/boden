@@ -14,37 +14,34 @@ class CMakeError(Exception):
 
 
 def ordered(obj):
-  if isinstance(obj, dict):
-    return sorted((k, ordered(v)) for k, v in obj.items())
-  if isinstance(obj, list):
-    return sorted(ordered(x) for x in obj)
-  else:
-    return obj
+    if isinstance(obj, dict):
+      return sorted((k, ordered(v)) for k, v in obj.items())
+    return sorted(ordered(x) for x in obj) if isinstance(obj, list) else obj
 
 def col_print(title, array):
-  print()
-  print()
-  print(title)
+    print()
+    print()
+    print(title)
 
-  indentwidth = 4
-  indent = " " * indentwidth
+    indentwidth = 4
+    indent = " " * indentwidth
 
-  if not array:
-    print(indent + "<None>")
-    return
+    if not array:
+        print(f"{indent}<None>")
+        return
 
-  padwidth = 2
+    padwidth = 2
 
-  maxitemwidth = len(max(array, key=len))
+    maxitemwidth = len(max(array, key=len))
 
-  numCols = max(1, int((termwidth - indentwidth + padwidth) / (maxitemwidth + padwidth)))
+    numCols = max(1, int((termwidth - indentwidth + padwidth) / (maxitemwidth + padwidth)))
 
-  numRows = len(array) // numCols + 1
+    numRows = len(array) // numCols + 1
 
-  pad = " " * padwidth
+    pad = " " * padwidth
 
-  for index in range(numRows):
-    print(indent + pad.join(item.ljust(maxitemwidth) for item in array[index::numRows]))
+    for index in range(numRows):
+      print(indent + pad.join(item.ljust(maxitemwidth) for item in array[index::numRows]))
 
 filterPacket = lambda x: x
 
@@ -76,7 +73,7 @@ exitWithError = lambda proc: defaultExitWithError(proc)
 serverTag = "SERVER"
 
 def printServer(*args):
-    print(serverTag + ">", *args)
+    print(f"{serverTag}>", *args)
     print()
     sys.stdout.flush()
 
@@ -86,30 +83,28 @@ def printClient(*args):
     sys.stdout.flush()
 
 def waitForRawMessage(cmakeCommand):
-  stdoutdata = ""
-  payload = ""
-  while not cmakeCommand.poll():
-    stdoutdataLine = cmakeCommand.outPipe.readline()
-    if stdoutdataLine:
-      if isinstance(stdoutdataLine, str):
-        stdoutdata += stdoutdataLine
-      else:
-        stdoutdata += stdoutdataLine.decode('utf-8')
-    else:
-      break
-    begin = stdoutdata.find('[== "CMake Server" ==[\n')
-    end = stdoutdata.find(']== "CMake Server" ==]')
+    stdoutdata = ""
+    payload = ""
+    while not cmakeCommand.poll():
+        if not (stdoutdataLine := cmakeCommand.outPipe.readline()):
+            break
+        if isinstance(stdoutdataLine, str):
+          stdoutdata += stdoutdataLine
+        else:
+          stdoutdata += stdoutdataLine.decode('utf-8')
+        begin = stdoutdata.find('[== "CMake Server" ==[\n')
+        end = stdoutdata.find(']== "CMake Server" ==]')
 
-    if begin != -1 and end != -1:
-      begin += len('[== "CMake Server" ==[\n')
-      payload = stdoutdata[begin:end]
-      jsonPayload = json.loads(payload)
-      filteredPayload = filterPacket(jsonPayload)
-      if print_communication and filteredPayload:
-        printServer(filteredPayload)
-      if filteredPayload is not None or jsonPayload is None:
-          return jsonPayload
-      stdoutdata = stdoutdata[(end+len(']== "CMake Server" ==]')):]
+        if begin != -1 and end != -1:
+          begin += len('[== "CMake Server" ==[\n')
+          payload = stdoutdata[begin:end]
+          jsonPayload = json.loads(payload)
+          filteredPayload = filterPacket(jsonPayload)
+          if print_communication and filteredPayload:
+            printServer(filteredPayload)
+          if filteredPayload is not None or jsonPayload is None:
+              return jsonPayload
+          stdoutdata = stdoutdata[(end+len(']== "CMake Server" ==]')):]
 
 # Python2 has no problem writing the output of encodes directly,
 # but Python3 returns only 'int's for encode and so must be turned
@@ -179,32 +174,41 @@ def writeAndFlush(pipe, val):
 
 def initServerProc(cmakeCommand, comm, extraEnv = {}):
 
-  environment = os.environ
-  environment.update(extraEnv)
+    environment = os.environ
+    environment |= extraEnv
 
-  if comm == PIPE:
-    pipeName = getPipeName()
-    cmakeCommand = subprocess.Popen([cmakeCommand, "-E", "server", "--experimental", "--pipe=" + pipeName], env=environment)
-    attachPipe(cmakeCommand, pipeName)
-  else:
-    cmakeCommand = subprocess.Popen([cmakeCommand, "-E", "server", "--experimental", "--debug"],
-                                    stdin=subprocess.PIPE,
-                                    stdout=subprocess.PIPE,
-                                    env=environment)
-    cmakeCommand.outPipe = cmakeCommand.stdout
-    cmakeCommand.inPipe = cmakeCommand.stdin
-    cmakeCommand.write = lambda val: writeAndFlush(cmakeCommand.inPipe, val)
+    if comm == PIPE:
+        pipeName = getPipeName()
+        cmakeCommand = subprocess.Popen(
+            [
+                cmakeCommand,
+                "-E",
+                "server",
+                "--experimental",
+                f"--pipe={pipeName}",
+            ],
+            env=environment,
+        )
+        attachPipe(cmakeCommand, pipeName)
+    else:
+        cmakeCommand = subprocess.Popen([cmakeCommand, "-E", "server", "--experimental", "--debug"],
+                                        stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE,
+                                        env=environment)
+        cmakeCommand.outPipe = cmakeCommand.stdout
+        cmakeCommand.inPipe = cmakeCommand.stdin
+        cmakeCommand.write = lambda val: writeAndFlush(cmakeCommand.inPipe, val)
 
-  #packet = waitForRawMessage(cmakeCommand)
-  #if packet == None:
-  #  print("Not in server mode")
-  #  sys.exit(2)
+    #packet = waitForRawMessage(cmakeCommand)
+    #if packet == None:
+    #  print("Not in server mode")
+    #  sys.exit(2)
 
-  #if packet['type'] != 'hello':
-  #  print("No hello message")
-  #  sys.exit(3)
+    #if packet['type'] != 'hello':
+    #  print("No hello message")
+    #  sys.exit(3)
 
-  return cmakeCommand
+    return cmakeCommand
 
 def exitProc(cmakeCommand):
   # Tell the server to exit.
@@ -222,29 +226,28 @@ def exitProc(cmakeCommand):
     raise
 
 def waitForMessage(cmakeCommand, expected):
-  data = ordered(expected)
-  packet = ordered(waitForRawMessage(cmakeCommand))
+    data = ordered(expected)
+    packet = ordered(waitForRawMessage(cmakeCommand))
 
-  if packet != data:
-    raise CMakeError("Expected" + packet + "but got " + data, data)
-  return packet
+    if packet != data:
+        raise CMakeError(f"Expected{packet}but got {data}", data)
+    return packet
 
 def waitForReply(cmakeCommand, originalType, cookie, skipProgress):
-  gotResult = False
-  while True:
-    packet = waitForRawMessage(cmakeCommand)
-    t = packet['type']
-    if packet['cookie'] != cookie or packet['inReplyTo'] != originalType:
-      print("cookie or inReplyTo mismatch")
-      sys.exit(4)
-    if t == 'message' or t == 'progress':
-      if skipProgress:
-        continue
-    if t == 'reply':
-        break
-    raise CMakeError("Unrecognized message", packet)
+    gotResult = False
+    while True:
+        packet = waitForRawMessage(cmakeCommand)
+        t = packet['type']
+        if packet['cookie'] != cookie or packet['inReplyTo'] != originalType:
+          print("cookie or inReplyTo mismatch")
+          sys.exit(4)
+        if t in ['message', 'progress'] and skipProgress:
+            continue
+        if t == 'reply':
+            break
+        raise CMakeError("Unrecognized message", packet)
 
-  return packet
+    return packet
 
 def waitForError(cmakeCommand, originalType, cookie, message):
   packet = waitForRawMessage(cmakeCommand)
@@ -267,89 +270,79 @@ def handshake(cmakeCommand, major, minor, source, build, generator, extraGenerat
   waitForReply(cmakeCommand, 'handshake', 'TEST_HANDSHAKE', False)
 
 def validateGlobalSettings(cmakeCommand, cmakeCommandPath, data):
-  packet = waitForReply(cmakeCommand, 'globalSettings', '', False)
+    packet = waitForReply(cmakeCommand, 'globalSettings', '', False)
 
-  capabilities = packet['capabilities']
+    capabilities = packet['capabilities']
 
-  # validate version:
-  cmakeoutput = subprocess.check_output([ cmakeCommandPath, "--version" ], universal_newlines=True)
-  cmakeVersion = cmakeoutput.splitlines()[0][14:]
+    # validate version:
+    cmakeoutput = subprocess.check_output([ cmakeCommandPath, "--version" ], universal_newlines=True)
+    cmakeVersion = cmakeoutput.splitlines()[0][14:]
 
-  version = capabilities['version']
-  versionString = version['string']
-  vs = str(version['major']) + '.' + str(version['minor']) + '.' + str(version['patch'])
-  if (versionString != vs and not versionString.startswith(vs + '-')):
-    sys.exit(8)
-  if (versionString != cmakeVersion):
-    sys.exit(9)
+    version = capabilities['version']
+    versionString = version['string']
+    vs = str(version['major']) + '.' + str(version['minor']) + '.' + str(version['patch'])
+    if versionString != vs and not versionString.startswith(f'{vs}-'):
+        sys.exit(8)
+    if (versionString != cmakeVersion):
+      sys.exit(9)
 
-  print("VERSION:", versionString)
+    print("VERSION:", versionString)
 
-  # validate generators:
-  generatorObjects = capabilities['generators']
+    # validate generators:
+    generatorObjects = capabilities['generators']
 
-  cmakeoutput = subprocess.check_output([ cmakeCommandPath, "--help" ], universal_newlines=True)
-  index = cmakeoutput.index('\nGenerators\n\n')
-  cmakeGenerators = []
-  for line in cmakeoutput[index + 12:].splitlines():
-    if not line.startswith('  '):
-      continue
-    if line.startswith('    '):
-      continue
-    equalPos = line.find('=')
-    tmp = ''
-    if (equalPos > 0):
-      tmp = line[2:equalPos].strip()
-    else:
-      tmp = line.strip()
-    if tmp.endswith(" [arch]"):
-      tmp = tmp[0:len(tmp) - 7]
-    if (len(tmp) > 0) and (" - " not in tmp):
-      cmakeGenerators.append(tmp)
+    cmakeoutput = subprocess.check_output([ cmakeCommandPath, "--help" ], universal_newlines=True)
+    index = cmakeoutput.index('\nGenerators\n\n')
+    cmakeGenerators = []
+    for line in cmakeoutput[index + 12:].splitlines():
+        if not line.startswith('  '):
+          continue
+        if line.startswith('    '):
+          continue
+        equalPos = line.find('=')
+        tmp = ''
+        tmp = line[2:equalPos].strip() if (equalPos > 0) else line.strip()
+        if tmp.endswith(" [arch]"):
+            tmp = tmp[:len(tmp) - 7]
+        if (len(tmp) > 0) and (" - " not in tmp):
+          cmakeGenerators.append(tmp)
 
-  generators = []
-  for genObj in generatorObjects:
-    generators.append(genObj['name'])
+    generators = [genObj['name'] for genObj in generatorObjects]
+    generators.sort()
+    cmakeGenerators.sort()
 
-  generators.sort()
-  cmakeGenerators.sort()
+    for gen in cmakeGenerators:
+        if gen not in generators:
+            sys.exit(10)
 
-  for gen in cmakeGenerators:
-    if (not gen in generators):
-        sys.exit(10)
+    gen = packet['generator']
+    if gen != '' and gen not in generators:
+        sys.exit(11)
 
-  gen = packet['generator']
-  if (gen != '' and not (gen in generators)):
-    sys.exit(11)
-
-  for i in data:
-    print("Validating", i)
-    if (packet[i] != data[i]):
-      sys.exit(12)
+    for i in data:
+      print("Validating", i)
+      if (packet[i] != data[i]):
+        sys.exit(12)
 
 def validateCache(cmakeCommand, data):
-  packet = waitForReply(cmakeCommand, 'cache', '', False)
+    packet = waitForReply(cmakeCommand, 'cache', '', False)
 
-  cache = packet['cache']
+    cache = packet['cache']
 
-  if (data['isEmpty']):
-    if (cache != []):
-      print('Expected empty cache, but got data.\n')
+    if (data['isEmpty']):
+      if (cache != []):
+        print('Expected empty cache, but got data.\n')
+        sys.exit(1)
+      return;
+
+    if (cache == []):
+      print('Expected cache contents, but got none.\n')
       sys.exit(1)
-    return;
 
-  if (cache == []):
-    print('Expected cache contents, but got none.\n')
-    sys.exit(1)
-
-  hadHomeDir = False
-  for value in cache:
-    if (value['key'] == 'CMAKE_HOME_DIRECTORY'):
-      hadHomeDir = True
-
-  if (not hadHomeDir):
-    print('No CMAKE_HOME_DIRECTORY found in cache.')
-    sys.exit(1)
+    hadHomeDir = any((value['key'] == 'CMAKE_HOME_DIRECTORY') for value in cache)
+    if (not hadHomeDir):
+      print('No CMAKE_HOME_DIRECTORY found in cache.')
+      sys.exit(1)
 
 def handleBasicMessage(proc, obj, debug):
   if 'sendRaw' in obj:

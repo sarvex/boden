@@ -8,11 +8,10 @@ class EnvDefault(argparse.Action):
     def __init__(self, option_strings, required=False, default=None, **kwargs):
         envvar = "BAUER_" + option_strings[-1].upper().strip('-').replace('-', '_')
 
-        if not default and envvar:
-            if envvar in os.environ:
-                default = os.environ[envvar]
-                if 'nargs' in kwargs and kwargs['nargs'] == '+':
-                    default = [default]
+        if not default and envvar and envvar in os.environ:
+            default = os.environ[envvar]
+            if 'nargs' in kwargs and kwargs['nargs'] == '+':
+                default = [default]
 
         if required and default:
             required = False
@@ -39,9 +38,9 @@ class BauerArgParser():
     def parse_args(self):
         options =self.parser.parse_args()
 
-        if options.command == None:
-          self.parser.print_help()
-          return None
+        if options.command is None:
+            self.parser.print_help()
+            return None
 
         if options.command == "manual":
           print(self.getManual())
@@ -52,12 +51,13 @@ class BauerArgParser():
         return options
 
     def buildBauerArguments(self, args, **kwargs):
-          prog = args[0]
-          self.parser = argparse.ArgumentParser(
+        prog = args[0]
+        self.parser = argparse.ArgumentParser(
             prog=prog,
-            description="Use '%s COMMAND --help' to get help for a specific command." % prog,
-            formatter_class=argparse.RawDescriptionHelpFormatter);
-          self.buildCommandParsers()
+            description=f"Use '{prog} COMMAND --help' to get help for a specific command.",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        );
+        self.buildCommandParsers()
 
     def setBaseParser(self, parser):
           self.parser = parser
@@ -69,18 +69,18 @@ class BauerArgParser():
     
     def addBaseConfigurationArguments(self, parsers, platforms=None, require=False):
         for parser in parsers:
-          if platforms == None:
-            platforms = self.bauerGlobals.platformMap.keys()
+            if platforms is None:
+                platforms = self.bauerGlobals.platformMap.keys()
 
-          configGroup = parser.add_argument_group('Compile target')
-          configGroup.add_argument('-p', "--platform", action=EnvDefault, help="The target platform", choices=platforms, required=require );
-          configGroup.add_argument('-b', "--build-system", action=EnvDefault, help="The cmake generator", required=require );
-          configGroup.add_argument('-c', "--config", action=EnvDefault, choices=["Debug", "Release"], required=require );
-          configGroup.add_argument('-a', "--arch", action=EnvDefault, help="The target architecture ( default: 'std' )", required=require );
-          configGroup.add_argument('-D', "--cmake-option", action='append', help="Allows to set additional cmake options")
+            configGroup = parser.add_argument_group('Compile target')
+            configGroup.add_argument('-p', "--platform", action=EnvDefault, help="The target platform", choices=platforms, required=require );
+            configGroup.add_argument('-b', "--build-system", action=EnvDefault, help="The cmake generator", required=require );
+            configGroup.add_argument('-c', "--config", action=EnvDefault, choices=["Debug", "Release"], required=require );
+            configGroup.add_argument('-a', "--arch", action=EnvDefault, help="The target architecture ( default: 'std' )", required=require );
+            configGroup.add_argument('-D', "--cmake-option", action='append', help="Allows to set additional cmake options")
 
-          buildFolderGroup = parser.add_argument_group('Build folder', "(optional)")
-          buildFolderGroup.add_argument("--build-folder", action=EnvDefault, help="The buildfolder root (default: ./build)")
+            buildFolderGroup = parser.add_argument_group('Build folder', "(optional)")
+            buildFolderGroup.add_argument("--build-folder", action=EnvDefault, help="The buildfolder root (default: ./build)")
 
     def addConfigurationArguments(self, parsers, platforms=None):
         self.addBaseConfigurationArguments(parsers, platforms, False)
@@ -147,16 +147,17 @@ class BauerArgParser():
             ('codesign', 'Sign libraries and executables', None)
           ]
 
-        command_map = {}
-        for command, desc, epilog in command_info:
-          command_map[command] = subs.add_parser(
-            command,
-            description=desc,
-            help=desc,
-            epilog=epilog,
-            prog=self.parser.prog+" "+command,
-            formatter_class=argparse.RawDescriptionHelpFormatter)
-
+        command_map = {
+            command: subs.add_parser(
+                command,
+                description=desc,
+                help=desc,
+                epilog=epilog,
+                prog=f"{self.parser.prog} {command}",
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+            )
+            for command, desc, epilog in command_info
+        }
         prepare = command_map["prepare"]
         build = command_map["build"]
         clean = command_map["clean"]
@@ -165,7 +166,7 @@ class BauerArgParser():
         package = command_map["package"]
         copy = command_map["copy"]
         open_project = command_map["open"]
-        
+
         doc = command_map["doc"]
         doc.add_argument('-a', '--addr', help="Address to serve pages on", default="127.0.0.1:8000")
 
@@ -200,11 +201,10 @@ class BauerArgParser():
         self.buildGlobalArguments([ self.parser, prepare, build, clean, distclean, run, package, open_project, doc ])
 
     def getPlatformHelp(self):
-        platformHelp = "";
-        for platformName, platformInfo in self.bauerGlobals.platformList:
-            platformHelp+="  %s: %s\n" % (platformName, platformInfo)
-
-        return platformHelp;
+        return "".join(
+            "  %s: %s\n" % (platformName, platformInfo)
+            for platformName, platformInfo in self.bauerGlobals.platformList
+        )
 
     def getPrepareEpilog(self):
       return """Pepares the project files for the specified TARGET (see below). BUILDSYSTEM

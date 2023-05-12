@@ -18,6 +18,6 @@ class ResourceFile:
 
         self.root_path = self.absolute_root_path(args, self.data)
 
-        logging.debug("Root path: %s" %(self.root_path))
+        logging.debug(f"Root path: {self.root_path}")
         logging.debug("Input data: \n%s"% pformat(self.data))
 

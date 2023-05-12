@@ -42,27 +42,35 @@ class AndroidRunner:
 
         target = self.find_target(args.target, configuration)
         if not target:
-            raise "Could not find target %s in cmake codemodel" % (args.target)
+            raise f"Could not find target {args.target} in cmake codemodel"
 
         target_defines = find_defines(target)
         packageId = from_defines(target_defines, "ANDROID_APP_ID", None)
 
         if not packageId:
-            raise "Could not find package id for target %s (should be a compile definition called ANDROID_APP_ID)" % (args.target) 
+            raise f"Could not find package id for target {args.target} (should be a compile definition called ANDROID_APP_ID)" 
 
-        self.logger.debug("Package Id: %s" %(packageId))
+        self.logger.debug(f"Package Id: {packageId}")
 
         androidAbi = self.buildExecutor.getAndroidABI(configuration)
         appIdToRun = packageId
         buildDir = self.buildFolder.getBuildDir(configuration)
 
         moduleNameInFileSystem = args.target
-        moduleFilePath = os.path.join(buildDir, moduleNameInFileSystem, "build", "outputs", "apk", args.config.lower(), moduleNameInFileSystem+"-"+args.config.lower()+".apk")
+        moduleFilePath = os.path.join(
+            buildDir,
+            moduleNameInFileSystem,
+            "build",
+            "outputs",
+            "apk",
+            args.config.lower(),
+            f"{moduleNameInFileSystem}-{args.config.lower()}.apk",
+        )
 
         if not os.path.exists(moduleFilePath):
-            raise Exception("APK not found - expected here: "+moduleFilePath)
-        
-        deviceName = "bdnTestAVD"+str(random.getrandbits(32))
+            raise Exception(f"APK not found - expected here: {moduleFilePath}")
+
+        deviceName = f"bdnTestAVD{random.getrandbits(32)}"
 
         self.prepareAndroid(androidAbi)
         deviceName = self.createEmulatorDevice(androidAbi, deviceName)
@@ -83,7 +91,7 @@ class AndroidRunner:
                 self.closeEmulator(deviceName, emulatorProcess)
 
             self.logger.info("Deleting virtual device for emulator...")
-            deleteDeviceCommand = '"%s" delete avd --name %s' % (self.avdManagerPath, deviceName)
+            deleteDeviceCommand = f'"{self.avdManagerPath}" delete avd --name {deviceName}'
 
             subprocess.call(deleteDeviceCommand, stdout=self.subprocess_out, shell=True, env=self.androidEnvironment )
 
@@ -95,14 +103,13 @@ class AndroidRunner:
 
 
     def prepareAndroid(self, androidAbi):
-        self.logger.info("Ensuring that all necessary android packages are installed (API Version: %s, ABI: %s)..." % (self.buildExecutor.androidEmulatorApiVersion, androidAbi) )
+        self.logger.info(
+            f"Ensuring that all necessary android packages are installed (API Version: {self.buildExecutor.androidEmulatorApiVersion}, ABI: {androidAbi})..."
+        )
 
         emulatorAbi = self.getEmulatorAbi(androidAbi)
 
-        sdkManagerCommand = '"%s" "emulator" "system-images;android-%s;google_apis;%s"' % (
-            self.sdkManagerPath,
-            self.buildExecutor.androidEmulatorApiVersion,
-            emulatorAbi )
+        sdkManagerCommand = f'"{self.sdkManagerPath}" "emulator" "system-images;android-{self.buildExecutor.androidEmulatorApiVersion};google_apis;{emulatorAbi}"'
 
         subprocess.check_call( sdkManagerCommand, stdout=self.subprocess_out, shell=True, env=self.androidEnvironment )
 
@@ -116,12 +123,7 @@ class AndroidRunner:
 
         emulatorAbi = self.getEmulatorAbi(androidAbi)
 
-        createDeviceCommand = '"%s" create avd --name "%s" --force --abi google_apis/%s --package "system-images;android-%s;google_apis;%s"' % \
-            (   self.avdManagerPath,
-                deviceName,
-                emulatorAbi,
-                self.buildExecutor.androidEmulatorApiVersion,
-                emulatorAbi )
+        createDeviceCommand = f'"{self.avdManagerPath}" create avd --name "{deviceName}" --force --abi google_apis/{emulatorAbi} --package "system-images;android-{self.buildExecutor.androidEmulatorApiVersion};google_apis;{emulatorAbi}"'
 
         # avdmanager will ask us wether we want to create a custom profile. We do not want that,
         # so we pipe a "no" into stdin
@@ -163,10 +165,9 @@ class AndroidRunner:
         # to only use this parameter for specific log sources (also called "tags")
         # For example "-logcat myapp:w" would enable all messages with log level warning
         # or higher from the log source "myapp".
-        startEmulatorCommand = '"%s" -avd %s -gpu %s' % \
-            (   self.emulatorPath,
-                deviceName,
-                gpuOption )
+        startEmulatorCommand = (
+            f'"{self.emulatorPath}" -avd {deviceName} -gpu {gpuOption}'
+        )
 
         # the emulator process will not exit. So we just open it without
         # waiting.
@@ -186,7 +187,7 @@ class AndroidRunner:
 
         timeoutTime = time.time()+timeoutSeconds
         while True:
-            bootAnimStateCommand = '"%s" shell getprop init.svc.bootanim' % (self.adbPath)
+            bootAnimStateCommand = f'"{self.adbPath}" shell getprop init.svc.bootanim'
 
             # at first the command will fail, until the emulator process has initialized.
             # Then we will get a proper output, that will not be "stopped" while we boot.
@@ -223,10 +224,10 @@ class AndroidRunner:
                 emulatorState = "initializing (device connecting)"
 
             else:
-                raise Exception("Unrecognized boot animation state output: "+output)
+                raise Exception(f"Unrecognized boot animation state output: {output}")
 
-            self.logger.debug("Emulator state: " + emulatorState)
-            
+            self.logger.debug(f"Emulator state: {emulatorState}")
+
             if emulatorState=="boot finished":
                 # done booting
                 break
@@ -248,9 +249,7 @@ class AndroidRunner:
         self.logger.info("Installing app in emulator...")
 
         # now install the app in the emulator
-        installAppCommand = '"%s" install -t "%s"' % \
-            (   self.adbPath,
-                moduleFilePath )
+        installAppCommand = f'"{self.adbPath}" install -t "{moduleFilePath}"'
         subprocess.check_call(installAppCommand, stdout=self.subprocess_out, shell=True, env=self.androidEnvironment )
 
         self.logger.debug("Waiting 10 seconds...")
@@ -261,9 +260,9 @@ class AndroidRunner:
         self.logger.info(" Starting app in emulator...")
 
         # and run the executable in the emulator
-        appDataDirInEmulator = "/data/user/0/%s" % (appIdToRun)
+        appDataDirInEmulator = f"/data/user/0/{appIdToRun}"
 
-        runAppCommand = '"%s" shell am start -a android.intent.action.MAIN -n %s/io.boden.android.NativeRootActivity' % ( self.adbPath, appIdToRun )
+        runAppCommand = f'"{self.adbPath}" shell am start -a android.intent.action.MAIN -n {appIdToRun}/io.boden.android.NativeRootActivity'
 
         # we pass the commandline parameters as "extra" to the android app.
         # These can be accessed inside the app via "activity.getIntent().getExtras()".
@@ -289,7 +288,7 @@ class AndroidRunner:
                     param_array_string += "\\,"
                 param_array_string += param
 
-            runAppCommand += ' --esa commandline-args "%s"' % param_array_string
+            runAppCommand += f' --esa commandline-args "{param_array_string}"'
 
         self.logger.debug("runAppCommand: %s", runAppCommand )
         subprocess.check_call(runAppCommand, shell=True, env=self.androidEnvironment )
@@ -303,7 +302,7 @@ class AndroidRunner:
         self.logger.info("Waiting for app inside emulator to exit...")
 
         while True:
-            getProcessListCommand = '"%s" shell ps' % ( self.adbPath )
+            getProcessListCommand = f'"{self.adbPath}" shell ps'
             procListOutput = subprocess.check_output(getProcessListCommand, shell=True, env=self.androidEnvironment, universal_newlines=True )
 
             found_process = False
@@ -313,7 +312,7 @@ class AndroidRunner:
                 if appIdToRun in str(line_words):
                     found_process = True
                     break
-            
+
             if not found_process:
                 break
             time.sleep(2)
@@ -321,7 +320,7 @@ class AndroidRunner:
         self.logger.info("Process inside emulator has exited.")
 
     def fetchOutput(self, args, appIdToRun):
-        appDataDirInEmulator = "/data/user/0/%s" % (appIdToRun)
+        appDataDirInEmulator = f"/data/user/0/{appIdToRun}"
 
         # the application has now exited. If the caller wants us to read output data from
         # a file inside the emulator then we do that now.
@@ -342,9 +341,9 @@ class AndroidRunner:
                 # it would be nice if we could use adb pull. However we will get permission
                 # denied when we try to access private data.
                 # Luckily we can use run-as instead
-                #pull_command = '"%s" pull "%s" "%s"' % ( self.adbPath, fromPath, temp_output_path )                                
-                readCommand = '"%s" shell run-as "%s" cat "%s"' % ( self.adbPath, appIdToRun, fromPath )
-                
+                #pull_command = '"%s" pull "%s" "%s"' % ( self.adbPath, fromPath, temp_output_path )
+                readCommand = f'"{self.adbPath}" shell run-as "{appIdToRun}" cat "{fromPath}"'
+
                 # if the file does not exist then the pull command will fail.
                 readExitCode = subprocess.call(readCommand, shell=True, stdout=readTargetFile, env=self.androidEnvironment )
 
@@ -358,7 +357,7 @@ class AndroidRunner:
     def closeEmulator(self, deviceName, emulatorProcess):
         self.logger.warning("Killing emulator")
 
-        killEmulatorCommand = '"%s" -s "%s" emu kill' % ( self.adbPath, "emulator-5554" )
+        killEmulatorCommand = f'"{self.adbPath}" -s "emulator-5554" emu kill'
         subprocess.check_call(killEmulatorCommand, stdout=self.subprocess_out, shell=True, env=self.androidEnvironment )
 
         self.logger.debug("Waiting for emulator to exit...")

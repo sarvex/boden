@@ -11,7 +11,7 @@ class GeneratorInfo(object):
             raise Exception("Couldn't find cmake executable. Please download and install it from www.cmake.org/download")
 
         self.generatorHelpList = [];
-        self.generatorNames = [];    
+        self.generatorNames = [];
         self.generatorAliasMap = {};
 
         self._cmakeError = None
@@ -32,7 +32,7 @@ class GeneratorInfo(object):
 
         except subprocess.CalledProcessError as e:            
             self._cmakeError = error.CMakeProblemError(e, errOutput);
-        
+
         if self._cmakeError is None:
             cmakeHelp = cmakeHelp.strip();
 
@@ -46,20 +46,19 @@ class GeneratorInfo(object):
 
             self.generatorHelpList.reverse();
 
-            
+
             for line in self.generatorHelpList:
                 if line.startswith("  ") and len(line)>2 and line[2]!=" ":
                     line = line.strip();
 
                     name, sep, rest = line.partition(" = ");
                     if sep:
-                        name = name.strip();
-                        if name:
+                        if name := name.strip():
                             self.generatorNames.append(name);
 
-        
+
             vsPrefix = "Visual Studio ";
-            for name in self.generatorNames:        
+            for name in self.generatorNames:
                 if name.startswith(vsPrefix):
                     words = name[len(vsPrefix):].strip().split();
                     if len(words)>=2:
@@ -67,7 +66,7 @@ class GeneratorInfo(object):
                             internalVersion = int(words[0]);
                             yearVersion = int(words[1]);
 
-                            self.generatorAliasMap[ "vs"+words[1] ] = vsPrefix+words[0]+" "+words[1];
+                            self.generatorAliasMap[f"vs{words[1]}"] = vsPrefix+words[0]+" "+words[1];
                         except Exception as e:
                             # ignore exceptions. The generator string does not have the expected format.
                             pass;
@@ -84,7 +83,7 @@ class GeneratorInfo(object):
 
             if "CodeLite - Unix Makefiles" in self.generatorNames:
                 self.generatorAliasMap["codelite"] = "CodeLite - Unix Makefiles"
-                
+
 
         self.generatorAliasHelp = "Aliases for build system names:\n";
         for aliasName in sorted( self.generatorAliasMap.keys() ):
@@ -110,10 +109,7 @@ class GeneratorInfo(object):
 
         generatorName = generatorName.lower();
 
-        if "makefile" in generatorName or "ninja" in generatorName:
-            return True;
-        else:
-            return False;
+        return "makefile" in generatorName or "ninja" in generatorName
 
     def getCMakeGeneratorName(self,generatorName):
         return self.generatorAliasMap.get(generatorName, generatorName)

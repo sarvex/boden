@@ -35,7 +35,9 @@ class TemplateCreator:
         project_folder = os.path.join(os.path.abspath(args.project_folder), args.project_name)
 
         if os.path.exists(project_folder) and len(os.listdir(project_folder)) > 0:
-            raise error.ProgramArgumentError("Selected folder %s is not empty!" % project_folder)
+            raise error.ProgramArgumentError(
+                f"Selected folder {project_folder} is not empty!"
+            )
 
         if args.project_name == 'test':
             raise error.ProgramArgumentError("'test' is not a valid project name, since cmake regards it as a special target!")

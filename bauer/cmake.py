@@ -39,7 +39,7 @@ class CMake:
 
         packet = cmakelib.waitForRawMessage(self.proc)
 
-        if packet == None:
+        if packet is None:
             raise Exception("Unknown failure, maybe cmake does not support server mode")
 
         if packet['type'] != 'hello':
@@ -64,7 +64,9 @@ class CMake:
 
         self.globalSettings = packet
         self.sourceDirectory = sourceDirectory
-        self.logger.debug("VERSION: %s" % self.globalSettings["capabilities"]["version"]["string"])
+        self.logger.debug(
+            f'VERSION: {self.globalSettings["capabilities"]["version"]["string"]}'
+        )
 
     def waitForResult(self, expectedReply, expectedCookie):
         while 1:
@@ -94,34 +96,44 @@ class CMake:
         self.logger.info("Done.")
 
         self.logger.info("Generating ...")
-        
+
         cmakelib.writePayload(self.proc, { "type":"compute", "cookie":"COMPUTE" } )
         self.waitForResult("compute", "COMPUTE")
 
         cmakelib.writePayload(self.proc, { "type":"codemodel", "cookie":"CODEMODEL" } )
         payload = cmakelib.waitForRawMessage(self.proc)
 
-        if not payload or not "cookie" in payload or payload["cookie"] != "CODEMODEL":
-            raise Exception("Something went wrong trying to configure the project. ( Unexpected response from cmake during codemodel request: %s )" % (payload))
+        if (
+            not payload
+            or "cookie" not in payload
+            or payload["cookie"] != "CODEMODEL"
+        ):
+            raise Exception(
+                f"Something went wrong trying to configure the project. ( Unexpected response from cmake during codemodel request: {payload} )"
+            )
 
         self.codeModel = payload
-        
+
         realSourceDirectory = os.path.realpath(self.sourceDirectory)
-        self.logger.debug("Comparing: %s" % (realSourceDirectory))
+        self.logger.debug(f"Comparing: {realSourceDirectory}")
 
         for cmakeConfig in self.codeModel['configurations']:
             for project in cmakeConfig['projects']:
                 realProjectSourceDirectory = os.path.realpath(project["sourceDirectory"])
-                self.logger.debug("with:     %s" % (realProjectSourceDirectory))
+                self.logger.debug(f"with:     {realProjectSourceDirectory}")
                 if realProjectSourceDirectory == realSourceDirectory:
                     cmakeConfig['main-project'] = project
-                    self.logger.debug("Main project for '%s' : %s" % (cmakeConfig['name'], project['name']))
+                    self.logger.debug(
+                        f"Main project for '{cmakeConfig['name']}' : {project['name']}"
+                    )
 
         cmakelib.writePayload(self.proc, { "type":"cache", "cookie":"CACHE" } )
         payload = cmakelib.waitForRawMessage(self.proc)
 
-        if not payload or not "cookie" in payload or payload["cookie"] != "CACHE":
-            raise Exception("Something went wrong trying to configure the project. ( Unexpected response from cmake during cache request: %s )" % (payload))
+        if not payload or "cookie" not in payload or payload["cookie"] != "CACHE":
+            raise Exception(
+                f"Something went wrong trying to configure the project. ( Unexpected response from cmake during cache request: {payload} )"
+            )
 
         #self.cache = payload
         self.cache = {}
@@ -139,7 +151,7 @@ class CMake:
         cmakeTargetToRun = None
 
         for cmakeConfiguration in self.codeModel["configurations"]:
-            if cmakeConfiguration["name"] == '' or cmakeConfiguration["name"] == config:
+            if cmakeConfiguration["name"] in ['', config]:
                 self.logger.debug("Found config: %s", cmakeConfiguration["name"])
 
                 for cmakeProject in cmakeConfiguration["projects"]:
@@ -152,10 +164,12 @@ class CMake:
                             cmakeTargetToRun = cmakeTarget
 
         if not cmakeTargetToRun:
-            raise error.ProgramArgumentError("Couldn't find module %s" % self.args.target)
+            raise error.ProgramArgumentError(f"Couldn't find module {self.args.target}")
 
         if cmakeTargetToRun["type"] != "EXECUTABLE":
-            raise error.ProgramArgumentError("Module %s is not an executable" % self.args.target)
+            raise error.ProgramArgumentError(
+                f"Module {self.args.target} is not an executable"
+            )
 
         return cmakeTargetToRun
 

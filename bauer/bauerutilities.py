@@ -3,7 +3,7 @@ import sys, os, subprocess
 class BauerGlobals:
     def __init__(self):
         self.platformList = []
-        
+
         if sys.platform == "darwin":
             self.platformList = [ 
                 ("mac", "Apple Mac OS (formerly OSX)" ),
@@ -11,9 +11,7 @@ class BauerGlobals:
 
         self.platformList += [ ("android", "Android devices" ) ]
 
-        self.platformMap = {}
-        for platformName, platformInfo in self.platformList:
-            self.platformMap[platformName] = platformInfo;
+        self.platformMap = dict(self.platformList)
 
     def open_file(self, filename):
         if sys.platform == "win32":

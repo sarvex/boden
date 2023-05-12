@@ -40,9 +40,8 @@ class Roger(base.Roger):
 
             for resources in resource_lists:
                 lang_suffix = ""
-                if "language" in resources:
-                    if len(resources["language"]) > 0:
-                        lang_suffix = "-%s" % (resources["language"])
+                if "language" in resources and len(resources["language"]) > 0:
+                    lang_suffix = f'-{resources["language"]}'
 
                 if "images" in resources:
                     images = resources["images"]
@@ -51,12 +50,54 @@ class Roger(base.Roger):
                         bundle_path = image["bundle-path"]
                         resolutions = image['resolutions'];
 
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "0.75x", lang_suffix + "-ldpi")
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "1.0x",  lang_suffix + "-mdpi")
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "1.5x",  lang_suffix + "-hdpi")
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "2.0x",  lang_suffix + "-xhdpi")
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "3.0x",  lang_suffix + "-xxhdpi")
-                        self.copy_image(args, "res/drawable", bundle_path, resolutions, "4.0x",  lang_suffix + "-xxxhdpi")
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "0.75x",
+                            f"{lang_suffix}-ldpi",
+                        )
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "1.0x",
+                            f"{lang_suffix}-mdpi",
+                        )
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "1.5x",
+                            f"{lang_suffix}-hdpi",
+                        )
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "2.0x",
+                            f"{lang_suffix}-xhdpi",
+                        )
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "3.0x",
+                            f"{lang_suffix}-xxhdpi",
+                        )
+                        self.copy_image(
+                            args,
+                            "res/drawable",
+                            bundle_path,
+                            resolutions,
+                            "4.0x",
+                            f"{lang_suffix}-xxxhdpi",
+                        )
 
                 if "raw" in resources:
                     raws = resources["raw"]

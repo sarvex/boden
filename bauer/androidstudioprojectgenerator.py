@@ -19,10 +19,9 @@ def find_defines(app):
 
 def from_defines(defines, key, default):
     for define in defines:
-        r = r"%s=(.*)" % key
-        match = re.match(r, define)
-        if match:
-            return match.group(1)
+        r = f"{key}=(.*)"
+        if match := re.match(r, define):
+            return match[1]
     return default
 
 
@@ -35,7 +34,7 @@ class AndroidStudioProjectGenerator(object):
         self.androidBuildApiVersion = androidBuildApiVersion
         self.android_support_dir = os.path.normpath(os.path.join(os.path.realpath(__file__), "..", "android-support"))
 
-        self.logger.debug("Android support directory: %s" %(self.android_support_dir))
+        self.logger.debug(f"Android support directory: {self.android_support_dir}")
 
     def getGradleDependency(self):
         return "classpath 'com.android.tools.build:gradle:3.4.2'"
@@ -61,9 +60,11 @@ class AndroidStudioProjectGenerator(object):
         try:
             gradle_path = self.gradle.getGradlePath()
 
-            subprocess.check_call( '"%s" wrapper --gradle-version=5.3.1' % (gradle_path),
-                                   shell=True,
-                                   cwd=gradle_temp_dir);
+            subprocess.check_call(
+                f'"{gradle_path}" wrapper --gradle-version=5.3.1',
+                shell=True,
+                cwd=gradle_temp_dir,
+            );
 
             for name in os.listdir(gradle_temp_dir):
                 source_path = os.path.join( gradle_temp_dir, name)
@@ -81,22 +82,19 @@ class AndroidStudioProjectGenerator(object):
 
 
     def find_applications(self, project, args):
-        result = []
-        for target in project["targets"]:
-            if target["type"] == "EXECUTABLE":
-                if args.target and args.target != target["name"]:
-                    continue
-                result += [target]
-
-        return result;
+        return [
+            target
+            for target in project["targets"]
+            if target["type"] == "EXECUTABLE"
+            and (not args.target or args.target == target["name"])
+        ]
 
     def find_libraries(self, project):
-        result = []
-        for target in project["targets"]:
-            if not target["type"] == "EXECUTABLE":
-                result += [target]
-
-        return result;
+        return [
+            target
+            for target in project["targets"]
+            if target["type"] != "EXECUTABLE"
+        ]
 
     def create_top_level_build_gradle(self):
         gradle_template = Template(open(os.path.join(self.android_support_dir, "top.build.gradle.in"), "r").read())
@@ -105,7 +103,7 @@ class AndroidStudioProjectGenerator(object):
         open(os.path.join(self.project_dir, "build.gradle"), "w").write(result)
 
     def create_settings_gradle(self, apps):
-        module_list = ", ".join(list(("':%s'" % (target["name"]) for target in apps)))
+        module_list = ", ".join([f"""':{target["name"]}'""" for target in apps])
 
         gradle_template = Template(open(os.path.join(self.android_support_dir, "settings.gradle.in"), "r").read())
         result = gradle_template.substitute(include_list = module_list )
@@ -118,18 +116,24 @@ class AndroidStudioProjectGenerator(object):
 
 
     def de_unicode(self, string):
-        if sys.version_info <= (3,0):
-            return string.encode("utf-8")
-        else:
-            return string
+        return string.encode("utf-8") if sys.version_info <= (3,0) else string
 
     def gather_directories(self, app, project):
         targets = self.find_libraries(project)
         targets += [app]
 
-        source_directories = list( ( self.de_unicode(target["sourceDirectory"] + "/src") for target in targets ))
-        include_directories = list( ( self.de_unicode(target["sourceDirectory"] + "/include") for target in targets ))
-        java_directories = list( ( self.de_unicode(target["sourceDirectory"] + "/java") for target in targets ))
+        source_directories = [
+            self.de_unicode(target["sourceDirectory"] + "/src")
+            for target in targets
+        ]
+        include_directories = [
+            self.de_unicode(target["sourceDirectory"] + "/include")
+            for target in targets
+        ]
+        java_directories = [
+            self.de_unicode(target["sourceDirectory"] + "/java")
+            for target in targets
+        ]
 
         return (source_directories, include_directories, java_directories)     
 
@@ -149,17 +153,19 @@ class AndroidStudioProjectGenerator(object):
         directories = self.gather_directories(app, project)
 
         gradle_template = Template(open(os.path.join(self.android_support_dir, "target.build.gradle.in"), "r").read())
-        
+
         cmakelists_path = os.path.join(project["sourceDirectory"], "CMakeLists.txt").replace('\\', '/')
 
-        abi_filter_string = ""
-        if android_abi:
-            abi_filter_string = "abiFilters '%s'" % android_abi
-
-        android_dependecy_string = "".join(list( ("    implementation '%s'\n" % (dependency) for dependency in android_dependencies)))
+        abi_filter_string = f"abiFilters '{android_abi}'" if android_abi else ""
+        android_dependecy_string = "".join(
+            [
+                "    implementation '%s'\n" % (dependency)
+                for dependency in android_dependencies
+            ]
+        )
         target_dependency_string = "" #"".join(list( ("    implementation project(':%s')\n" % dependency for dependency in target_dependencies)))
         targets = [app["name"]]
-        cmake_target_list = ", ".join( list(('"%s"' % (target) for target in targets)))
+        cmake_target_list = ", ".join([f'"{target}"' for target in targets])
 
         target_ndk_abi_block = ""
 
@@ -195,7 +201,7 @@ class AndroidStudioProjectGenerator(object):
 
         strings_template = Template(open(os.path.join(self.android_support_dir, "strings.xml.in"), "r").read())
 
-        strings = '<string name="app_name">%s</string>' % (app["name"])
+        strings = f'<string name="app_name">{app["name"]}</string>'
         result = strings_template.substitute( xml_string_entries = strings )
 
         open(os.path.join(directory, "strings.xml"), "w").write(result)
@@ -228,7 +234,9 @@ class AndroidStudioProjectGenerator(object):
         resource_dest_dir = os.path.join(module_directory, "src", "main")
 
         if os.path.exists(resource_source_dir):
-            self.logger.debug("Copying resources ( %s => %s )" %(resource_source_dir, resource_dest_dir))
+            self.logger.debug(
+                f"Copying resources ( {resource_source_dir} => {resource_dest_dir} )"
+            )
             self.copytree(resource_source_dir, resource_dest_dir)
 
     def generate(self, project, androidAbi, target_dependencies, args):
@@ -239,8 +247,8 @@ class AndroidStudioProjectGenerator(object):
         android_min_sdk_version = self.cmake.cache["BDN_ANDROID_MIN_SDK_VERSION"]
         android_dependencies = self.cmake.cache["BAUER_ANDROID_DEPENDENCIES"].split(';')
         android_extra_java_directories = list(filter(None, self.cmake.cache["BAUER_ANDROID_EXTRA_JAVA_DIRECTORIES"].split(';')))
-        self.logger.debug("Dependencies: %s" % android_dependencies)
-        self.logger.debug("Extra Java Directories: %s" % android_extra_java_directories)
+        self.logger.debug(f"Dependencies: {android_dependencies}")
+        self.logger.debug(f"Extra Java Directories: {android_extra_java_directories}")
 
         self.prepare_gradle()
         self.create_top_level_build_gradle()

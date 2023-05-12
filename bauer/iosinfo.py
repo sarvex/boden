@@ -28,7 +28,7 @@ class IOSInfo:
         devices = {}
 
         matches = re.finditer(simDeviceRegex, result, re.MULTILINE)
-        for matchNum, match in enumerate(matches):
+        for match in matches:
             name = match.groups()[0]
             deviceId = match.groups()[1]
 
@@ -48,7 +48,7 @@ class IOSInfo:
             version = float(match.groups()[1])
             name = match.groups()[2]
 
-            if not osType in versions:
+            if osType not in versions:
                 versions[osType] = {}
             versions[osType][version] = name
 
@@ -82,7 +82,7 @@ class IOSInfo:
         self.logger.critical("Couldn't find Device type %s", name)
         self.logger.info("Available device types:")
         for name, deviceId in deviceTypes.items():
-            self.logger.info("  %s" % (name))
+            self.logger.info(f"  {name}")
 
         raise error.ProgramArgumentError("--ios-device-type invalid")
 
@@ -92,15 +92,14 @@ class IOSInfo:
             n,version = name.split(' ')[:2]
             fversion = float(version)
 
-            if n in versions:
-                if fversion in versions[n]:
-                    return versions[n][fversion]
-        
+            if n in versions and fversion in versions[n]:
+                return versions[n][fversion]
+
         self.logger.critical("Couldn't find iOS version %s", name)
         self.logger.info("Available versions:")
         for type, v in versions.items():
             for version in v.keys():
-                self.logger.info("  %s %s" % (type, version))
+                self.logger.info(f"  {type} {version}")
 
         raise error.ProgramArgumentError("--ios-simulator-version invalid")
 

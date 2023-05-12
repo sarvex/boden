@@ -9,8 +9,8 @@ class CompilerInfo:
         self.gccVersion = self.getGCCVersion()
         self.clangVersion = self.getClangVersion()
 
-        self.logger.info("Detected GCC version %s" % (repr(self.gccVersion)));
-        self.logger.info("Detected Clang version %s" % (repr(self.clangVersion)));
+        self.logger.info(f"Detected GCC version {repr(self.gccVersion)}");
+        self.logger.info(f"Detected Clang version {repr(self.clangVersion)}");
 
     def getGCCVersion(self):
         try:
@@ -50,7 +50,4 @@ class CompilerInfo:
                 if not preferLast:
                     break;
 
-        if selectedVer==None:
-            return None;
-        else:
-            return tuple(selectedVer);
+        return None if selectedVer is None else tuple(selectedVer)

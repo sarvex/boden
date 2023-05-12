@@ -30,7 +30,12 @@ class ProgramArgumentError(ErrorWithExitCode):
 
 class CMakeProblemError(ErrorWithExitCode):
     def __init__(self, e, errorOutput=None):        
-        ErrorWithExitCode.__init__(self, EXIT_CMAKE_PROBLEM, "There was a problem calling cmake. CMake is required and must be installed to run this." + ( (" Error output: "+errorOutput) if errorOutput else "" ) )
+        ErrorWithExitCode.__init__(
+            self,
+            EXIT_CMAKE_PROBLEM,
+            "There was a problem calling cmake. CMake is required and must be installed to run this."
+            + (f" Error output: {errorOutput}" if errorOutput else ""),
+        )
 
 
 class ToolFailedError(ErrorWithExitCode):
@@ -42,18 +47,18 @@ class ToolFailedError(ErrorWithExitCode):
 
 class InvalidPlatformNameError(ProgramArgumentError):
     def __init__(self, platformName):
-        ProgramArgumentError.__init__(self, "Invalid platform name: '%s'" % platformName);
+        ProgramArgumentError.__init__(self, f"Invalid platform name: '{platformName}'");
 
 
 
 class InvalidArchitectureError(ProgramArgumentError):
     def __init__(self, arch):
-        ProgramArgumentError.__init__(self, "Invalid architecture name: '%s'" % arch);
+        ProgramArgumentError.__init__(self, f"Invalid architecture name: '{arch}'");
 
 
 class InvalidConfigNameError(ProgramArgumentError):
     def __init__(self, platformName):
-        ProgramArgumentError.__init__(self, "Invalid config name: '%s'" % configName);
+        ProgramArgumentError.__init__(self, f"Invalid config name: '{configName}'");
 
 
 

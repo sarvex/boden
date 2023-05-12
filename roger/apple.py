@@ -32,8 +32,7 @@ class Roger(base.Roger):
         if real_ext:
             dest_name += real_ext;
 
-        dest = os.path.join(args.output_directory, lang_folder_name, dest_name)
-        return dest
+        return os.path.join(args.output_directory, lang_folder_name, dest_name)
 
     def destination_path_flattened(self, args, src, bundle_path, lang_folder_name, suffix, real_ext = None):
         src = self.full_path(src)
@@ -46,8 +45,7 @@ class Roger(base.Roger):
             dest_ext = real_ext
         dest_name = "".join([dest_name, dest_ext])
 
-        dest = os.path.join(args.output_directory, lang_folder_name, dest_name)
-        return dest
+        return os.path.join(args.output_directory, lang_folder_name, dest_name)
 
     def copy_file(self, args, lang_folder_name, src, bundle_path, suffix, real_ext = None, flatten_mac = True):
         dest = ''
@@ -58,10 +56,9 @@ class Roger(base.Roger):
         return self.copy(args, src, dest)
 
     def copy_image(self, args, lang_folder_name, bundle_path, resolutions, resolutionId, suffix, flatten_mac = True):
-        if resolutionId in resolutions:
-            if len(resolutions[resolutionId]) > 0:
-                source_image = self.get_source_image(args, resolutions[resolutionId])
-                return self.copy_file(args, lang_folder_name, source_image, bundle_path, suffix, None, flatten_mac)
+        if resolutionId in resolutions and len(resolutions[resolutionId]) > 0:
+            source_image = self.get_source_image(args, resolutions[resolutionId])
+            return self.copy_file(args, lang_folder_name, source_image, bundle_path, suffix, None, flatten_mac)
         return False
 
     def combine_images_mac(self, args, resolutions, lang_folder_name, bundle_path):
@@ -94,8 +91,19 @@ class Roger(base.Roger):
         build_args.action = "build"
         dest = os.path.relpath(asset_set.path, args.output_directory)
 
-        if self.copy_image(build_args, dest, "%s-icon-%s.png" % (idiom, size), resolutions, "%s@%s" % (size,scale), "@%s" % (scale), flatten_mac=False):
-            asset_set.append_file("%s-icon-%s@%s.png" % (idiom, size, scale), { "idiom" : idiom, "size" : size, "scale" : scale})
+        if self.copy_image(
+            build_args,
+            dest,
+            f"{idiom}-icon-{size}.png",
+            resolutions,
+            f"{size}@{scale}",
+            f"@{scale}",
+            flatten_mac=False,
+        ):
+            asset_set.append_file(
+                f"{idiom}-icon-{size}@{scale}.png",
+                {"idiom": idiom, "size": size, "scale": scale},
+            )
 
 
     def build(self, args):
@@ -111,9 +119,8 @@ class Roger(base.Roger):
 
             for resources in resource_lists:
                 lang_folder_name = "Base.lproj"
-                if "language" in resources:
-                    if len(resources["language"]) > 0:
-                        lang_folder_name = resources["language"] + ".lproj"
+                if "language" in resources and len(resources["language"]) > 0:
+                    lang_folder_name = resources["language"] + ".lproj"
 
                 if "images" in resources:
                     images = resources["images"]
@@ -122,22 +129,21 @@ class Roger(base.Roger):
                         bundle_path = image["bundle-path"]
                         resolutions = image['resolutions']
                         mac_combine = args.platform == 'mac'
-                        if args.platform == 'mac':
-                            if "mac_combine" in image:
-                                if image['mac_combine']:
-                                    mac_combine = image['mac_combine']
+                        if (
+                            args.platform == 'mac'
+                            and "mac_combine" in image
+                            and image['mac_combine']
+                        ):
+                            mac_combine = image['mac_combine']
 
 
                         if mac_combine:
                             self.combine_images_mac(args, resolutions, lang_folder_name, bundle_path)
-                            self.copy_image(args, lang_folder_name, bundle_path, resolutions, "3.0x", "@3x")
-                            self.copy_image(args, lang_folder_name, bundle_path, resolutions, "4.0x", "@4x")
                         else:
                             self.copy_image(args, lang_folder_name, bundle_path, resolutions, "1.0x", "")
                             self.copy_image(args, lang_folder_name, bundle_path, resolutions, "2.0x", "@2x")
-                            self.copy_image(args, lang_folder_name, bundle_path, resolutions, "3.0x", "@3x")
-                            self.copy_image(args, lang_folder_name, bundle_path, resolutions, "4.0x", "@4x")
-
+                        self.copy_image(args, lang_folder_name, bundle_path, resolutions, "3.0x", "@3x")
+                        self.copy_image(args, lang_folder_name, bundle_path, resolutions, "4.0x", "@4x")
                 if "raw" in resources:
                     raws = resources["raw"]
                     for raw in raws:

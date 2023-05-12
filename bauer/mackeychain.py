@@ -17,18 +17,14 @@ class MacKeychain:
         self.logger.debug('security path: %s', self.sec)
 
     def callAndGet(self, cmd, useError):
-        self.logger.debug('Calling %s' % cmd)
+        self.logger.debug(f'Calling {cmd}')
         proc = None
         if useError:
             proc = subprocess.Popen(cmd, stderr=subprocess.PIPE)
         else:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
-        if useError:
-            output = proc.stderr.read()
-        else:
-            output = proc.stdout.read()
-
+        output = proc.stderr.read() if useError else proc.stdout.read()
         self.logger.debug('Output:\n%s' % output)
         return output
 
@@ -65,8 +61,8 @@ class MacKeychain:
     def unlockKeychain(self, keychainPath, password):
         self.logger.debug('Unlock: %s *****', keychainPath )
         currentKeychains = self.getCurrentKeychains()
-        if not keychainPath in currentKeychains:
-             raise error.ProgramArgumentError('Keychain %s is not registered!' % keychainPath)
+        if keychainPath not in currentKeychains:
+            raise error.ProgramArgumentError(f'Keychain {keychainPath} is not registered!')
 
         result = self.callAndGetError([self.sec, 'unlock-keychain', '-p', password, keychainPath])
         if len(result) > 0:
@@ -99,10 +95,13 @@ def main():
     parser = argparse.ArgumentParser()
     argParser.setBaseParser(parser)
 
-    cmdParsers = {}
-
     subs = parser.add_subparsers(title="Command", help='The command to execute', dest='command')
-    cmdParsers['add'] = subs.add_parser('add', description="Adds a keychain to the current users search list")
+    cmdParsers = {
+        'add': subs.add_parser(
+            'add',
+            description="Adds a keychain to the current users search list",
+        )
+    }
     cmdParsers['remove'] = subs.add_parser('remove', description="Removes a keychain from the current users search list")
     cmdParsers['unlock'] = subs.add_parser('unlock', description="Unlocks a keychain")
     listParser = subs.add_parser('list', description="List registered keychains")

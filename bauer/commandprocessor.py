@@ -61,7 +61,7 @@ class CommandProcessor:
             if defaultLadderKey in self.defaultLadder:
                 defaults = self.defaultLadder[defaultLadderKey]
 
-                self.logger.info("Defaulting to: %s - %s" % (defaults[0], defaults[1]))
+                self.logger.info(f"Defaulting to: {defaults[0]} - {defaults[1]}")
                 selectedConfigurations = [
                     BuildConfiguration(platform=defaults[0], arch=architecture, buildsystem=defaults[1], config=configuration)
                 ]
@@ -73,53 +73,58 @@ class CommandProcessor:
                 raise error.InvalidPlatformNameError(configuration.platform);
 
             buildDirectory = self.buildFolder.getBuildDir(configuration)
-    
+
             with GeneratorState(buildDirectory) as platformState:
-                if not "build-configuration" in platformState.state or BuildConfiguration(*platformState.state["build-configuration"]) != configuration:
-                    if os.path.exists(buildDirectory):
-                        self.logger.info("Build system does not match the one used when the projects for this platform were first prepared. Cleaning existing build files.");
-                        if "build-configuration" in platformState.state:
-                            self.logger.debug("Old config: ", BuildConfiguration(*platformState.state["build-configuration"]))
-                        else:
-                            self.logger.debug("(No previous state found)")
-                        self.logger.debug("New config: %s", configuration)
-                        shutil.rmtree(buildDirectory);
+                if (
+                    "build-configuration" not in platformState.state
+                    or BuildConfiguration(
+                        *platformState.state["build-configuration"]
+                    )
+                    != configuration
+                ) and os.path.exists(buildDirectory):
+                    self.logger.info("Build system does not match the one used when the projects for this platform were first prepared. Cleaning existing build files.");
+                    if "build-configuration" in platformState.state:
+                        self.logger.debug("Old config: ", BuildConfiguration(*platformState.state["build-configuration"]))
+                    else:
+                        self.logger.debug("(No previous state found)")
+                    self.logger.debug("New config: %s", configuration)
+                    shutil.rmtree(buildDirectory);
 
                 platformState.state["build-configuration"] = configuration;
-        
-                if command=="prepare":
-                    self.prepare(configuration, platformState);
 
-                elif command=="build":
+                if command == "build":
                     self.prepare(configuration, platformState);
                     self.build(configuration);
 
-                elif command=="clean":
-                    self.clean(configuration);
-
-                elif command=="distclean":
-                    self.distClean(buildDirectory);
-
-                elif command=="builddeps":
+                elif command == "builddeps":
                     self.buildDeps(configuration);
 
-                elif command=="run":
+                elif command == "clean":
+                    self.clean(configuration);
+
+                elif command == "codesign":
+                    self.prepare(configuration, platformState);
+                    self.codesign(configuration)
+                elif command == "copy":
+                    self.copy(buildDirectory)
+                elif command == "distclean":
+                    self.distClean(buildDirectory);
+
+                elif command == "open":
+                    self.prepare(configuration, platformState)
+                    self.open(configuration, buildDirectory)
+                elif command == "package":
+                    self.prepare(configuration, platformState);
+                    self.package(configuration);
+                elif command == "prepare":
+                    self.prepare(configuration, platformState);
+
+                elif command == "run":
                     self.prepare(configuration, platformState);
                     #self.build(configuration);
                     self.run(configuration);
-                elif command=="package":
-                    self.prepare(configuration, platformState);
-                    self.package(configuration);
-                elif command=="codesign":
-                    self.prepare(configuration, platformState);
-                    self.codesign(configuration)
-                elif command=="copy":
-                    self.copy(buildDirectory)
-                elif command=="open":
-                    self.prepare(configuration, platformState)
-                    self.open(configuration, buildDirectory)
                 else:
-                    raise error.ProgramArgumentError("Invalid command: '%s'" % command);
+                    raise error.ProgramArgumentError(f"Invalid command: '{command}'");
 
 
     def prepare(self, configuration, platformState):
@@ -153,7 +158,7 @@ class CommandProcessor:
             self.buildExecutor.clean(configuration, self.args)
 
     def distClean(self, buildDirectory):
-        self.logger.info("Cleaning %s" % (buildDirectory))
+        self.logger.info(f"Cleaning {buildDirectory}")
         if os.path.isdir(buildDirectory):
             shutil.rmtree(buildDirectory);
 
@@ -162,9 +167,13 @@ class CommandProcessor:
         codeSigner.sign(self.args)
 
     def open(self, configuration, buildDirectory):
-        cmake = self.buildExecutor.cmake if not configuration.platform == "android" else self.androidExecutor.cmake
-
         if configuration.buildsystem == 'Xcode':
+            cmake = (
+                self.buildExecutor.cmake
+                if configuration.platform != "android"
+                else self.androidExecutor.cmake
+            )
+
             for cmakeConfig in cmake.codeModel['configurations']:
                 project_file_name = os.path.join(buildDirectory, cmakeConfig['main-project']['name'] + ".xcodeproj")
                 self.logger.debug("Starting: %s", project_file_name)
@@ -184,8 +193,8 @@ class CommandProcessor:
             else:
                 studio_path = find_executable('studio')
                 self.logger.debug("Path: %s", studio_path)
-                
-                if studio_path == None:
+
+                if studio_path is None:
                     self.logger.warning("Couldn't find 'studio', please install via Android Studio => Tools => Create Command-line launcher")
                 else:
                     subprocess.Popen([studio_path, buildDirectory])

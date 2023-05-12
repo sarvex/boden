@@ -21,7 +21,9 @@ class DesktopRunner:
         self.logger.debug("Executable: %s", artifactToRun)
 
         if not artifactToRun:
-            raise error.ProgramArgumentError("Couldn't find path to exectuable for Module %s" % self.args.target)
+            raise error.ProgramArgumentError(
+                f"Couldn't find path to exectuable for Module {self.args.target}"
+            )
 
         self.logger.debug("Path: %s", artifactToRun)
 

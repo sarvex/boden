@@ -13,11 +13,12 @@ class BuildFolder:
         self.generatorInfo = generatorInfo
         self.logger = logging.getLogger(__name__)
 
-        if args.build_folder != None:
-            self.buildfolder = os.path.abspath(args.build_folder)
-            self.logger.debug("Build folder: %s" %(self.buildfolder))
-        else:
+        if args.build_folder is None:
             self.buildfolder = os.path.join(rootPath, "build")
+
+        else:
+            self.buildfolder = os.path.abspath(args.build_folder)
+            self.logger.debug(f"Build folder: {self.buildfolder}")
 
     def getBaseBuildDir(self):
         return self.buildfolder
@@ -34,12 +35,31 @@ class BuildFolder:
                 for arch in listDirectories(os.path.join(buildDir, platform)):
                     for buildsystem in listDirectories(os.path.join(buildDir, platform, arch)):
                         if self.generatorInfo.isSingleConfigBuildSystem(self.generatorInfo.getBuildSystemForFolderName(buildsystem)):
-                            for config in listDirectories( os.path.join(buildDir, platform, arch, buildsystem)):
-                                if os.path.exists( os.path.join(buildDir, platform, arch, buildsystem, config, '.generateProjects.state') ):
-                                    prepared.append( BuildConfiguration(platform=platform, arch=arch, buildsystem=buildsystem, config=config) )
-                        else:
-                            if os.path.exists( os.path.join(buildDir, platform, arch, buildsystem, '.generateProjects.state') ):
-                                prepared.append( BuildConfiguration(platform=platform, arch=arch, buildsystem=buildsystem, config=None) )
+                            prepared.extend(
+                                BuildConfiguration(
+                                    platform=platform,
+                                    arch=arch,
+                                    buildsystem=buildsystem,
+                                    config=config,
+                                )
+                                for config in listDirectories(
+                                    os.path.join(
+                                        buildDir, platform, arch, buildsystem
+                                    )
+                                )
+                                if os.path.exists(
+                                    os.path.join(
+                                        buildDir,
+                                        platform,
+                                        arch,
+                                        buildsystem,
+                                        config,
+                                        '.generateProjects.state',
+                                    )
+                                )
+                            )
+                        elif os.path.exists( os.path.join(buildDir, platform, arch, buildsystem, '.generateProjects.state') ):
+                            prepared.append( BuildConfiguration(platform=platform, arch=arch, buildsystem=buildsystem, config=None) )
         return prepared
 
     # Returns the closest match to the user selected configuration
@@ -47,16 +67,18 @@ class BuildFolder:
         matches = []
 
         for configuration in existingConfigurations:
-            if self.args.platform != None and self.args.platform != configuration.platform:
+            if self.args.platform not in [None, configuration.platform]:
                 continue
-            if self.args.arch != None and self.args.arch != configuration.arch:
+            if self.args.arch not in [None, configuration.arch]:
                 continue
-            if self.args.build_system != None and self.args.build_system != configuration.buildsystem:
+            if self.args.build_system not in [None, configuration.buildsystem]:
                 continue
-            if self.args.config != None and configuration[3] != None and self.args.config != configuration.config:
-                continue
-
-            matches.append(configuration)
+            if (
+                self.args.config is None
+                or configuration[3] is None
+                or self.args.config == configuration.config
+            ):
+                matches.append(configuration)
 
         return matches
 
@@ -70,7 +92,7 @@ class BuildFolder:
 
         # User specified configuration:
         if self.args.platform != None and self.args.build_system != None:
-            if len(matchedConfigurations) > 0 and self.args.arch == None:
+            if len(matchedConfigurations) > 0 and self.args.arch is None:
                 return matchedConfigurations
 
             isSingleConfigBuildSystem = self.generatorInfo.isSingleConfigBuildSystem(self.args.build_system)
@@ -80,14 +102,15 @@ class BuildFolder:
                 if not arch:
                     arch = 'std'
 
-                config = self.args.config
-                if not isSingleConfigBuildSystem:
-                    config = None
-
-                selectedConfiguration = [ BuildConfiguration(platform=self.args.platform, arch=arch, buildsystem=self.args.build_system, config=config) ]
-
-                return selectedConfiguration
-
+                config = None if not isSingleConfigBuildSystem else self.args.config
+                return [
+                    BuildConfiguration(
+                        platform=self.args.platform,
+                        arch=arch,
+                        buildsystem=self.args.build_system,
+                        config=config,
+                    )
+                ]
         return matchedConfigurations
 
     def getBuildDir(self, configuration):

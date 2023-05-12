@@ -33,16 +33,16 @@ class BuildExecutor:
         if args.config != None:
             configs = [args.config]
 
-        if target == None and args.target != None:
+        if target is None and args.target != None:
             target = args.target
 
         isSingleConfigBuildSystem = self.generatorInfo.isSingleConfigBuildSystem(configuration.buildsystem)
 
-        if not isSingleConfigBuildSystem and args.config == None:
-            configs = []
-            for cmakeConfiguration in self.cmake.codeModel["configurations"]:
-                configs += [cmakeConfiguration["name"]]
-
+        if not isSingleConfigBuildSystem and args.config is None:
+            configs = [
+                cmakeConfiguration["name"]
+                for cmakeConfiguration in self.cmake.codeModel["configurations"]
+            ]
         for config in configs:
             buildDirectory = self.buildFolder.getBuildDir(configuration)
             commandArguments = ["\"%s\"" % self.cmake.cmakeExecutable, "--build", "\"%s\"" % buildDirectory]
@@ -56,11 +56,9 @@ class BuildExecutor:
             if args.jobs != None:
                 generatorName = self.generatorInfo.getCMakeGeneratorName(configuration.buildsystem);
                 if "Visual Studio" in generatorName:
-                    os.environ["CL"] = "/MP" + args.jobs
-                elif "Xcode" in generatorName:
-                    pass # Can' specify multicore via command line :(                
-                else:
-                    commandArguments += ["--", "-j%s" % (args.jobs) ]
+                    os.environ["CL"] = f"/MP{args.jobs}"
+                elif "Xcode" not in generatorName:
+                    commandArguments += ["--", f"-j{args.jobs}"]
 
             commandLine = " ".join(commandArguments)
             self.logger.info("Calling: %s", commandLine)
@@ -88,23 +86,25 @@ class BuildExecutor:
         commandIsInQuote = False;
 
         if args.package_generator:
-            cmakeArguments += ["-DCPACK_GENERATOR=%s" % (args.package_generator)]
+            cmakeArguments += [f"-DCPACK_GENERATOR={args.package_generator}"]
 
         if args.package_folder:
             packageFolder = args.package_folder
             if not os.path.isabs(packageFolder):
                 packageFolder = os.path.join(self.buildFolder.getBaseBuildDir(), packageFolder)
 
-            cmakeArguments += ["-DCPACK_OUTPUT_FILE_PREFIX=%s" % (packageFolder)]
+            cmakeArguments += [f"-DCPACK_OUTPUT_FILE_PREFIX={packageFolder}"]
 
         if configuration.platform=="mac":
             if configuration.arch!="std":
                 raise error.InvalidArchitectureError(arch);
-            
+
             if args.macos_sdk_path:
-                cmakeArguments.extend( [ "-DCMAKE_OSX_SYSROOT=%s" % (args.macos_sdk_path) ] )
+                cmakeArguments.extend([f"-DCMAKE_OSX_SYSROOT={args.macos_sdk_path}"])
             if args.macos_min_version:
-                cmakeArguments.extend( [ "-DCMAKE_OSX_DEPLOYMENT_TARGET=%s" % (args.macos_min_version) ] )
+                cmakeArguments.extend(
+                    [f"-DCMAKE_OSX_DEPLOYMENT_TARGET={args.macos_min_version}"]
+                )
 
         elif configuration.platform=="ios":
             if generatorName == 'Xcode' and configuration.arch == "std":
@@ -119,10 +119,12 @@ class BuildExecutor:
                 expected_clangxx_location = os.path.join(xcodeDevPath, "Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++")
 
                 if not os.path.isfile(expected_clangxx_location):
-                    self.logger.warning('Expected file "%s" to exist but it did not' % (expected_clangxx_location))
+                    self.logger.warning(
+                        f'Expected file "{expected_clangxx_location}" to exist but it did not'
+                    )
 
             else:
-                if configuration.arch == "std" or configuration.arch == "simulator":
+                if configuration.arch in ["std", "simulator"]:
                     cmakeArguments.extend( [ "-DPLATFORM=SIMULATOR64" ] );
                 elif configuration.arch == "device":
                     cmakeArguments.extend( [ "-DPLATFORM=OS64" ] );
@@ -138,18 +140,18 @@ class BuildExecutor:
                 self.logger.error("Required CMake toolchain file not found: %s" , toolChainFilePath);
                 return 5;
 
-            cmakeArguments += ["-DCMAKE_TOOLCHAIN_FILE="+toolChainFilePath]
+            cmakeArguments += [f"-DCMAKE_TOOLCHAIN_FILE={toolChainFilePath}"]
 
 
         if configuration.config:
-            cmakeArguments += ["-DCMAKE_BUILD_TYPE="+configuration.config ]
+            cmakeArguments += [f"-DCMAKE_BUILD_TYPE={configuration.config}"]
 
         if cmakeArch:
-            cmakeArguments += ["-A "+cmakeArch ]
+            cmakeArguments += [f"-A {cmakeArch}"]
 
         if args.cmake_option:
             for option in args.cmake_option:
-                cmakeArguments += ["-D" + option]
+                cmakeArguments += [f"-D{option}"]
 
         if needsCleanBuildDir:
             shutil.rmtree(cmakeBuildDir)
